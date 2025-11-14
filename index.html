@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Layer7 - DSTAT Dashboard</title>
+    <title>Layer7 - Real-Time DSTAT Dashboard</title>
     <style>
       html, body {
         height: 100%;
@@ -18,17 +18,21 @@
         background-color: #f5f5f5;
       }
       #container {
-        width: 90%;
-        max-width: 1200px;
+        width: 95%;
+        max-width: 1400px;
         margin: 20px;
         background: white;
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
       }
-      #chart {
+      .chart-container {
         width: 100%;
         margin: 20px 0;
+      }
+      .chart {
+        height: 200px;
+        margin-bottom: 20px;
       }
       #info {
         text-align: center;
@@ -51,59 +55,132 @@
         font-weight: bold;
         margin-top: 10px;
       }
+      .summary {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      .summary-box {
+        background: #e0e0e0;
+        padding: 10px 20px;
+        border-radius: 5px;
+        margin: 5px;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
     <div id="container">
-      <h1 id="info">Layer7 DSTAT Dashboard</h1>
-      <p>Capturing requests from <code>/dstat</code></p>
+      <h1 id="info">Layer7 Real-Time DSTAT Dashboard</h1>
+      <p>Capturing real-time system metrics</p>
+
+      <div class="summary">
+        <div class="summary-box">Total Cores: <span id="totalCores">0</span></div>
+        <div class="summary-box">Total RAM: <span id="totalRam">0</span> GB</div>
+        <div class="summary-box">Total Replicas: <span id="totalReplicas">0</span></div>
+      </div>
+
       <div id="stats">
         <div class="stat-box">Requests: <span id="reqs">0</span></div>
         <div class="stat-box">Connections: <span id="conns">0</span></div>
-        <div class="stat-box">Memory: <span id="memory">0</span> MB</div>
+        <div class="stat-box">CPU: <span id="cpu">0</span>%</div>
+        <div class="stat-box">RAM: <span id="ram">0</span> GB</div>
+        <div class="stat-box">Power: <span id="power">0</span> kW</div>
       </div>
+
       <div id="alert" class="alert"></div>
-      <div id="chart"></div>
+
+      <div class="chart-container">
+        <div id="requestsChart" class="chart"></div>
+      </div>
+      <div class="chart-container">
+        <div id="connectionsChart" class="chart"></div>
+      </div>
+      <div class="chart-container">
+        <div id="cpuChart" class="chart"></div>
+      </div>
+      <div class="chart-container">
+        <div id="ramChart" class="chart"></div>
+      </div>
+      <div class="chart-container">
+        <div id="powerChart" class="chart"></div>
+      </div>
     </div>
 
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/modules/exporting.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        const chart = Highcharts.chart("chart", {
-          exporting: { enabled: true },
-          chart: { type: "area" },
-          title: { text: "Real-Time Metrics" },
-          xAxis: { type: "datetime" },
-          yAxis: { title: { text: "" } },
-          series: [
-            { name: "Requests", data: [] },
-            { name: "Connections", data: [] },
-            { name: "Memory Usage (MB)", data: [] }
-          ]
-        });
+        // Initialize charts
+        const charts = {
+          requests: Highcharts.chart("requestsChart", {
+            chart: { type: "area" },
+            title: { text: "Requests per Second" },
+            xAxis: { type: "datetime" },
+            yAxis: { title: { text: "Requests" } },
+            series: [{ name: "Requests", data: [] }]
+          }),
+          connections: Highcharts.chart("connectionsChart", {
+            chart: { type: "area" },
+            title: { text: "Active Connections" },
+            xAxis: { type: "datetime" },
+            yAxis: { title: { text: "Connections" } },
+            series: [{ name: "Connections", data: [] }]
+          }),
+          cpu: Highcharts.chart("cpuChart", {
+            chart: { type: "area" },
+            title: { text: "CPU Usage (%)" },
+            xAxis: { type: "datetime" },
+            yAxis: { title: { text: "Usage (%)" } },
+            series: [{ name: "CPU", data: [] }]
+          }),
+          ram: Highcharts.chart("ramChart", {
+            chart: { type: "area" },
+            title: { text: "RAM Usage (GB)" },
+            xAxis: { type: "datetime" },
+            yAxis: { title: { text: "Usage (GB)" } },
+            series: [{ name: "RAM", data: [] }]
+          }),
+          power: Highcharts.chart("powerChart", {
+            chart: { type: "area" },
+            title: { text: "Power Usage (kW)" },
+            xAxis: { type: "datetime" },
+            yAxis: { title: { text: "Usage (kW)" } },
+            series: [{ name: "Power", data: [] }]
+          })
+        };
 
         const ws = new WebSocket(
           (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/"
         );
 
         ws.onmessage = (event) => {
-          const { requests, connections, memory, alert } = JSON.parse(event.data);
+          const data = JSON.parse(event.data);
           const time = Date.now();
 
-          // Update chart
-          chart.series[0].addPoint([time, requests], true, chart.series[0].points.length > 60);
-          chart.series[1].addPoint([time, connections], true, chart.series[1].points.length > 60);
-          chart.series[2].addPoint([time, parseFloat(memory)], true, chart.series[2].points.length > 60);
+          // Update charts
+          Object.keys(charts).forEach(key => {
+            if (data[key] !== undefined) {
+              charts[key].series[0].addPoint([time, parseFloat(data[key])], true, charts[key].series[0].points.length > 60);
+            }
+          });
 
           // Update stats
-          document.getElementById("reqs").textContent = requests;
-          document.getElementById("conns").textContent = connections;
-          document.getElementById("memory").textContent = memory;
+          document.getElementById("reqs").textContent = data.requests || 0;
+          document.getElementById("conns").textContent = data.connections || 0;
+          document.getElementById("cpu").textContent = data.cpu || 0;
+          document.getElementById("ram").textContent = data.ram || 0;
+          document.getElementById("power").textContent = data.power || 0;
+
+          // Update summary
+          document.getElementById("totalCores").textContent = data.totalCores || 0;
+          document.getElementById("totalRam").textContent = data.totalRam || 0;
+          document.getElementById("totalReplicas").textContent = data.totalReplicas || 0;
 
           // Update alert
           const alertElement = document.getElementById("alert");
-          alertElement.textContent = alert || "";
+          alertElement.textContent = data.alert || "";
         };
       });
     </script>
