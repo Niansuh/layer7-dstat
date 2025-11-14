@@ -1,146 +1,115 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DSTAT - Advanced Dashboard</title>
+    <title>Layer7 - DSTAT Dashboard</title>
     <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-            background-color: #f0f2f5;
-            color: #333;
-        }
-        .dashboard-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 20px;
-            padding: 20px;
-            max-width: 1400px;
-            margin: auto;
-        }
-        .card {
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
-        .chart-container {
-            width: 100%;
-            height: 300px;
-        }
-        .info-card {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .info-card .label {
-            font-size: 1.2em;
-            color: #555;
-        }
-        .info-card .value {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: #00529B;
-        }
-        .info-card .unit {
-            font-size: 1em;
-            color: #777;
-            margin-left: 8px;
-        }
-        h1 {
-            text-align: center;
-            width: 100%;
-            color: #2c3e50;
-        }
+      html, body {
+        height: 100%;
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        background-color: #f5f5f5;
+      }
+      #container {
+        width: 90%;
+        max-width: 1200px;
+        margin: 20px;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      #chart {
+        width: 100%;
+        margin: 20px 0;
+      }
+      #info {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      #stats {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      .stat-box {
+        background: #f0f0f0;
+        padding: 10px 20px;
+        border-radius: 5px;
+        margin: 5px;
+      }
+      .alert {
+        color: red;
+        font-weight: bold;
+        margin-top: 10px;
+      }
     </style>
-</head>
-<body>
-    <h1>DSTAT - Real-time Application Monitoring</h1>
-    <div class="dashboard-container">
-        <div class="card info-card">
-            <span class="label">Active Connections</span>
-            <div>
-                <span id="info-connections" class="value">0</span>
-            </div>
-        </div>
-        <div class="card info-card">
-            <span class="label">Event Loop Lag</span>
-            <div>
-                <span id="info-lag" class="value">0</span><span class="unit">ms</span>
-            </div>
-        </div>
-        <div class="card">
-            <div id="chart-rps" class="chart-container"></div>
-        </div>
-        <div class="card">
-            <div id="chart-system" class="chart-container"></div>
-        </div>
+  </head>
+  <body>
+    <div id="container">
+      <h1 id="info">Layer7 DSTAT Dashboard</h1>
+      <p>Capturing requests from <code>/dstat</code></p>
+      <div id="stats">
+        <div class="stat-box">Requests: <span id="reqs">0</span></div>
+        <div class="stat-box">Connections: <span id="conns">0</span></div>
+        <div class="stat-box">CPU: <span id="cpu">0</span>%</div>
+        <div class="stat-box">Memory: <span id="memory">0</span>%</div>
+      </div>
+      <div id="alert" class="alert"></div>
+      <div id="chart"></div>
     </div>
 
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/modules/exporting.js"></script>
     <script>
-        window.onload = () => {
-            const createChart = (containerId, title, yAxisTitle, series) => {
-                return Highcharts.chart(containerId, {
-                    chart: { type: 'area' },
-                    title: { text: title },
-                    xAxis: { type: 'datetime' },
-                    yAxis: { title: { text: yAxisTitle } },
-                    series: series,
-                    credits: { enabled: false },
-                    time: { useUTC: false }
-                });
-            };
+      document.addEventListener("DOMContentLoaded", () => {
+        const chart = Highcharts.chart("chart", {
+          exporting: { enabled: true },
+          chart: { type: "area" },
+          title: { text: "Real-Time Metrics" },
+          xAxis: { type: "datetime" },
+          yAxis: { title: { text: "" } },
+          series: [
+            { name: "Requests", data: [] },
+            { name: "Connections", data: [] },
+            { name: "CPU Usage (%)", data: [] },
+            { name: "Memory Usage (%)", data: [] }
+          ]
+        });
 
-            const chartRps = createChart('chart-rps', 'Requests Per Second', 'RPS', [{ name: 'Requests', data: [] }]);
-            
-            const chartSystem = createChart('chart-system', 'System Usage', null, [
-                { name: 'Avg CPU Usage (%)', data: [], yAxis: 0 },
-                { name: 'Total Memory (MB)', data: [], yAxis: 1 }
-            ]);
-            // Reconfigure system chart for dual axes
-            chartSystem.update({
-                yAxis: [{
-                    title: { text: 'Avg CPU Usage (%)', style: { color: Highcharts.getOptions().colors[0] } },
-                    labels: { style: { color: Highcharts.getOptions().colors[0] } },
-                    max: 100,
-                    min: 0,
-                }, {
-                    title: { text: 'Total Memory (MB)', style: { color: Highcharts.getOptions().colors[1] } },
-                    labels: { style: { color: Highcharts.getOptions().colors[1] } },
-                    opposite: true
-                }]
-            });
+        const ws = new WebSocket(
+          (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/"
+        );
 
+        ws.onmessage = (event) => {
+          const { requests, connections, cpu, memory, alert } = JSON.parse(event.data);
+          const time = Date.now();
 
-            const infoConnections = document.getElementById('info-connections');
-            const infoLag = document.getElementById('info-lag');
+          // Update chart
+          chart.series[0].addPoint([time, requests], true, chart.series[0].points.length > 60);
+          chart.series[1].addPoint([time, connections], true, chart.series[1].points.length > 60);
+          chart.series[2].addPoint([time, cpu], true, chart.series[2].points.length > 60);
+          chart.series[3].addPoint([time, parseFloat(memory)], true, chart.series[3].points.length > 60);
 
-            const ws = new WebSocket(
-                (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/"
-            );
+          // Update stats
+          document.getElementById("reqs").textContent = requests;
+          document.getElementById("conns").textContent = connections;
+          document.getElementById("cpu").textContent = cpu.toFixed(2);
+          document.getElementById("memory").textContent = memory;
 
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    const time = new Date().getTime();
-
-                    // Update info cards
-                    infoConnections.innerText = data.activeConnections;
-                    infoLag.innerText = data.maxEventLoopLagMs.toFixed(2);
-
-                    // Add points to charts
-                    const shift = chartRps.series[0].points.length > 60; // Keep only 60 points
-                    chartRps.series[0].addPoint([time, data.rps], true, shift);
-                    chartSystem.series[0].addPoint([time, parseFloat(data.cpuUsage.toFixed(2))], true, shift);
-                    chartSystem.series[1].addPoint([time, parseFloat(data.memoryRssMb.toFixed(2))], true, shift);
-
-                } catch (e) {
-                    console.error("Failed to parse WebSocket data:", e);
-                }
-            };
+          // Update alert
+          const alertElement = document.getElementById("alert");
+          alertElement.textContent = alert || "";
+        };
+      });
+    </script>
+  </body>
+</html>
