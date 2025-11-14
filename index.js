@@ -3,7 +3,6 @@ const fs = require("fs");
 const WebSocket = require("ws");
 const cluster = require("cluster");
 const os = require("os");
-const osUtils = require("os-utils");
 
 const cpus = os.cpus().length;
 const port = 8080;
@@ -56,12 +55,10 @@ if (cluster.isMaster) {
     });
 
     process.on("message", (data) => {
-        const cpuUsage = osUtils.cpuUsage();
-        const memoryUsage = (os.totalmem() - os.freemem()) / os.totalmem() * 100;
+        const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024;
         const metrics = {
             requests: data.requests,
             connections: activeConnections,
-            cpu: cpuUsage * 100,
             memory: memoryUsage.toFixed(2),
             alert: data.requests > 1000 ? "High traffic!" : null
         };
