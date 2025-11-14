@@ -1,12 +1,12 @@
 const http = require("http");
-const fs =fs.readFileSync("./index.html");
+const fs = require("fs"); // <-- CORRECTED: Import the 'fs' module
 const WebSocket = require("ws");
 const cluster = require("cluster");
 const os = require("os");
 
 const cpus = os.cpus().length;
 const port = 8080;
-const index = fs.readFileSync("./index.html");
+const index = fs.readFileSync("./index.html"); // <-- CORRECTED: Use the imported 'fs' module
 
 const STATS_INTERVAL = 1000; // 1 second
 
@@ -88,6 +88,7 @@ if (cluster.isMaster) {
   const handler = function (req, res) {
     // Count every request
     requestsHandled++;
+    res.setHeader("Content-Type", "text/html");
     res.end(index);
   };
 
