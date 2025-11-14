@@ -1,18 +1,24 @@
 {
   "name": "layer7-dstat",
   "version": "1.0.0",
-  "description": "A simple layer7 dstat on the web",
+  "description": "A real-time Layer7 DSTAT dashboard with CPU, memory, and connection monitoring",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["dstat", "monitoring", "realtime", "dashboard", "Node.js"],
   "author": "Filippo Finke",
+  "license": "MIT",
   "dependencies": {
-    "ws": "^7.2.1"
+    "ws": "^7.2.1",
+    "pidusage": "^3.0.2"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/filippofinke/layer7-dstat.git"
+    "url": "https://github.com/Niansuh/layer7-dstat.git"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
