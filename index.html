@@ -1,89 +1,146 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Layer7 - DSTAT</title>
+    <title>DSTAT - Advanced Dashboard</title>
     <style>
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-      }
-
-      body {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-      }
-
-      body > div {
-        width: 100%;
-      }
-
-      #chart {
-        width: 80%;
-        margin: auto;
-      }
-
-      #info {
-        margin-top: 2em;
-        text-align: center;
-        font-family: Arial, Helvetica, sans-serif;
-      }
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: auto;
+        }
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-container {
+            width: 100%;
+            height: 300px;
+        }
+        .info-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .info-card .label {
+            font-size: 1.2em;
+            color: #555;
+        }
+        .info-card .value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #00529B;
+        }
+        .info-card .unit {
+            font-size: 1em;
+            color: #777;
+            margin-left: 8px;
+        }
+        h1 {
+            text-align: center;
+            width: 100%;
+            color: #2c3e50;
+        }
     </style>
-  </head>
-
-  <body>
-    <div>
-      <h2 id="info"></h2>
-      <div id="chart"></div>
+</head>
+<body>
+    <h1>DSTAT - Real-time Application Monitoring</h1>
+    <div class="dashboard-container">
+        <div class="card info-card">
+            <span class="label">Active Connections</span>
+            <div>
+                <span id="info-connections" class="value">0</span>
+            </div>
+        </div>
+        <div class="card info-card">
+            <span class="label">Event Loop Lag</span>
+            <div>
+                <span id="info-lag" class="value">0</span><span class="unit">ms</span>
+            </div>
+        </div>
+        <div class="card">
+            <div id="chart-rps" class="chart-container"></div>
+        </div>
+        <div class="card">
+            <div id="chart-system" class="chart-container"></div>
+        </div>
     </div>
+
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/modules/exporting.js"></script>
     <script>
-      window.onload = () => {
-        let info = document.getElementById("info");
+        window.onload = () => {
+            const createChart = (containerId, title, yAxisTitle, series) => {
+                return Highcharts.chart(containerId, {
+                    chart: { type: 'area' },
+                    title: { text: title },
+                    xAxis: { type: 'datetime' },
+                    yAxis: { title: { text: yAxisTitle } },
+                    series: series,
+                    credits: { enabled: false },
+                    time: { useUTC: false }
+                });
+            };
 
-        let chart = Highcharts.chart("chart", {
-          exporting: {
-            enabled: true,
-          },
-          chart: {
-            type: "area",
-          },
-          title: {
-            text: "Layer7 DSTAT",
-          },
-          xAxis: {
-            type: "datetime",
-          },
-          yAxis: {
-            title: {
-              text: "",
-            },
-          },
-          series: [
-            {
-              name: "Requests",
-              data: [],
-            },
-          ],
-        });
+            const chartRps = createChart('chart-rps', 'Requests Per Second', 'RPS', [{ name: 'Requests', data: [] }]);
+            
+            const chartSystem = createChart('chart-system', 'System Usage', null, [
+                { name: 'Avg CPU Usage (%)', data: [], yAxis: 0 },
+                { name: 'Total Memory (MB)', data: [], yAxis: 1 }
+            ]);
+            // Reconfigure system chart for dual axes
+            chartSystem.update({
+                yAxis: [{
+                    title: { text: 'Avg CPU Usage (%)', style: { color: Highcharts.getOptions().colors[0] } },
+                    labels: { style: { color: Highcharts.getOptions().colors[0] } },
+                    max: 100,
+                    min: 0,
+                }, {
+                    title: { text: 'Total Memory (MB)', style: { color: Highcharts.getOptions().colors[1] } },
+                    labels: { style: { color: Highcharts.getOptions().colors[1] } },
+                    opposite: true
+                }]
+            });
 
-        info.innerText = "Capturing requests from " + location.host + "/dstat";
 
-        let ws = new WebSocket(
-          (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/"
-        );
+            const infoConnections = document.getElementById('info-connections');
+            const infoLag = document.getElementById('info-lag');
 
-        ws.onmessage = (event) => {
-          let requests = Number(event.data);
-          let time = new Date().getTime();
-          chart.series[0].addPoint([time, requests], true, chart.series[0].points.length > 60);
-        };
-      };
-    </script>
-  </body>
-</html>
+            const ws = new WebSocket(
+                (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/"
+            );
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    const time = new Date().getTime();
+
+                    // Update info cards
+                    infoConnections.innerText = data.activeConnections;
+                    infoLag.innerText = data.maxEventLoopLagMs.toFixed(2);
+
+                    // Add points to charts
+                    const shift = chartRps.series[0].points.length > 60; // Keep only 60 points
+                    chartRps.series[0].addPoint([time, data.rps], true, shift);
+                    chartSystem.series[0].addPoint([time, parseFloat(data.cpuUsage.toFixed(2))], true, shift);
+                    chartSystem.series[1].addPoint([time, parseFloat(data.memoryRssMb.toFixed(2))], true, shift);
+
+                } catch (e) {
+                    console.error("Failed to parse WebSocket data:", e);
+                }
+            };
